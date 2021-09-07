@@ -1,0 +1,13 @@
+name = "OptStoic"
+uuid = "ed7b985e-05bf-459a-814b-19eb4d109ca1"
+authors = ["Victor Vera Frazao <viver101@hhu.de> and contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
