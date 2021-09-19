@@ -1,24 +1,4 @@
 
-function extend_formulae(database)
-    updated_formulae = Dict()
-    elem_set = Vector()
-    for m in metabolites(database)
-        elem_set = vcat(elem_set, collect(keys(metabolite_formula(database, m))))
-    end
-    elem_set = Set(elem_set)
-    for m in metabolites(database)
-        formula = metabolite_formula(database, m)
-        t = setdiff(elem_set, Set(collect(keys(formula))))
-        for i in t
-            if i ∉ keys(formula)
-                formula[i] = 0
-            end
-        end
-        updated_formulae[m] = formula
-    end
-    return updated_formulae
-end
-
 """
     function collect_dGf(database; ph::Float64 = 7.0, pmg::Float64 = 2.0, i_strengh::Quantity = 100.0u"mM", temp::Quantity = 25u"°C", db_id = bigg)
 Collects ΔG of formation for all metabolites in `database` via Component Contribution.
@@ -124,39 +104,6 @@ function collect_dGr_bounds(database;
     end
 end
 
-"""
-    function adjust_model(database, variation_tres =.5, dGr_dict =Dict())
-Reduces model to usable reactions. It excludes exchange reactions, those where no Gibbs free energy could be calculated or with too large standard deviation, depending on the given coefficient of variation threshold (`variation_tres`). 
-"""
-function adjust_model(database, variation_tres = .5)
-    dGr_dict, dGr_bounds = collect_dGr_bounds(database)
-    
-    for rxn in reactions(database)
-        if startswith(rxn, "EX_") #excluding exchanges
-            database = remove_reaction(database, rxn)
-        elseif typeof(dGr_dict[rxn]) == String #excluding reactions without
-            database = remove_reaction(database, rxn)
-        else
-            try
-                if dGr_dict[rxn].val.err/dGr_dict[rxn].val.val > variation_tres
-                    database = remove_reaction(database, rxn)
-                end
-            catch
-                database = remove_reaction(database, rxn)
-            end
-        end
-    end
-
-    mod_bounds = OrderedDict()
-    for (k ,v) in dGr_bounds
-        if k in reactions(database)
-            mod_bounds[k] = v
-        end
-    end
-
-    return database, mod_bounds
-end
-
 
 function reaction_bounds(bound_dc; M = 1000)
     binary_dc_lb = OrderedDict()
@@ -180,31 +127,4 @@ function reaction_bounds(bound_dc; M = 1000)
 end
 
 
-"""
-    find_metabolite_by_formula(query::String, database)
 
-Searching function for every metabolite that matches the chemical formula. Eases process of finding the desired metabolites faster in larger data arrays.
-The `query` string should preferably be formatted according to the Hill notation. The `database` needs to be of one of the model types.
-Please note that the pattern matching is exact and thus is prone to typing errors or alternate formulation (e.g. "NaCl" instead of "ClNa").
-"""
-function find_metabolite_by_formula(database, query::String)
-    res_ls = String[]
-    for met in metabolites(database)
-        refstr = ""
-        for (elem, elnum) in metabolite_formula(database, met)
-            if  elnum != 1
-                refstr = string(refstr, elem, elnum)
-            else
-                refstr = string(refstr, elem)
-            end
-        end
-        if  refstr == query
-            push!(res_ls, met)
-        end
-    end
-    if length(res_ls) == 0
-        println("No metabolite with matching formula found.")
-    else
-        return res_ls
-    end
-end

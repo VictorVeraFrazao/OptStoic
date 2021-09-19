@@ -9,7 +9,8 @@ using OrderedCollections
 using JuMP
 using Gurobi
 
-include("OptStoic_procedure.jl")
 include("searching_functions.jl")
+include("ModelBuilds.jl")
+include("Analysis.jl")
 
 end

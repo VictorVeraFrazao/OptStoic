@@ -65,23 +65,6 @@ function build_OptStoic_model(
     return os_model
 end
 
-function OptStoic_optimize(os_model, return_solution = true)
-    optimize!(os_model)
-    if return_solution == false
-        return os_model
-    else
-        res_dc = Dict()
-        res_dc[name(os_model[:S])] = value(os_model[:S])
-        for i in os_model[:T]
-            res_dc[name(i)[1:end-3]] = value(i)
-        end
-        for i in os_model[:CoR]
-            res_dc[name(i)[1:end-3]] = value(i)
-        end
-    end
-    return os_model, res_dc
-end
-
 """
     function build_MinFlux_model(database, dG_ub, dG_lb, optstoic_solution)
 Builds model for MinFlux procedure.
