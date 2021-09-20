@@ -1,1 +1,10 @@
 # OptStoic
+This package provides the tool for the LP/MILP procedure OptStoic and MinFlux in Julia.
+## Description
+OptStoic is a two-step MP/MILP procedure for *de novo* metabolic pathway construction, the first step being an maximization of the stoichiometric coefficients of target molecules in the given overall biochemical reaction (OptStoic) and the second being a minimization of flux of the reactions in order to create a shortest corresponding pathway (MinFlux). Both steps are, inter alia, constrained by energy and mass balance.
+## Dependencies
+This package heavily depends on the [COBREXA package](https://github.com/LCSB-BioCore/COBREXA.jl) to handle models in Julia as well as [eQuilibrator package](https://github.com/stelmo/Equilibrator.jl) for Component Contribution methods required by the energy constraints. Currently, the package only is compatible with well-curated SBML models, provided by [BiGG database](bigg.ucsd.edu/) and the Gurobi optimizer. It is planned to extend the usage onto large-scale databases and include support for other LP solvers.
+## Current development status
+The package is not stable and requires heavy fixes on built and overall code structure. The functions are not connected properly, so invoking the functions independently is required. The `OptStoic` optimization procedure in the `Analysis.jl` file is stable and works as far as tested after constructing a corresponding model. The `MinFlux` procedure still doesn't work as desired and needs fixing. 
+## Reference
+Please cite [Maranas, Costas. (2015). Designing overall stoichiometric conversions and intervening metabolic reactions. Scientific Reports. 5. 16009. 10.1038/srep16009. ](https://www.researchgate.net/publication/283979269_Designing_overall_stoichiometric_conversions_and_intervening_metabolic_reactions) and [Ng, C.Y., Wang, L., Chowdhury, A. et al. Pareto Optimality Explanation of the Glycolytic Alternatives in Nature. Sci Rep 9, 2633 (2019). https://doi.org/10.1038/s41598-019-38836-9](https://www.nature.com/articles/s41598-019-38836-9).
