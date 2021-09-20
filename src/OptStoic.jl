@@ -5,12 +5,11 @@ using eQuilibrator
 using Unitful, Measurements
 using ProgressMeter
 using Suppressor
-using OrderedCollections
 using JuMP
-using Gurobi
 
-include("searching_functions.jl")
-include("ModelBuilds.jl")
-include("Analysis.jl")
+include("build_model.jl")
+include("analysis.jl")
+
+export build_OptStoic_model, build_MinFlux_model
 
 end

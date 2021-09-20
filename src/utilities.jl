@@ -10,13 +10,13 @@ function find_metabolite_by_formula(database, query::String)
     for met in metabolites(database)
         refstr = ""
         for (elem, elnum) in metabolite_formula(database, met)
-            if  elnum != 1
+            if elnum != 1
                 refstr = string(refstr, elem, elnum)
             else
                 refstr = string(refstr, elem)
             end
         end
-        if  refstr == query
+        if refstr == query
             push!(res_ls, met)
         end
     end
@@ -28,14 +28,14 @@ function find_metabolite_by_formula(database, query::String)
 end
 
 function print_formula(stoichiometry)
-	leftstr = string()
-	rightstr = string()
-	for (k, v) in stoichiometry
-		if v < 0
-			leftstr = string(leftstr, string(abs(v)), k, " + ")
-		elseif v > 0
-			rightstr = string(rightstr, string(abs(v)), k, " + ")
-		end
-	end
-	println(string(leftstr[1:end-3], " => ", rightstr[1:end-3]))
+    leftstr = string()
+    rightstr = string()
+    for (k, v) in stoichiometry
+        if v < 0
+            leftstr = string(leftstr, string(abs(v)), k, " + ")
+        elseif v > 0
+            rightstr = string(rightstr, string(abs(v)), k, " + ")
+        end
+    end
+    println(string(leftstr[1:end-3], " => ", rightstr[1:end-3]))
 end

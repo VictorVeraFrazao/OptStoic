@@ -27,9 +27,9 @@ end
     function adjust_model(database, variation_tres =.5, dGr_dict =Dict())
 Reduces model to usable reactions. It excludes exchange reactions, those where no Gibbs free energy could be calculated or with too large standard deviation, depending on the given coefficient of variation threshold (`variation_tres`). 
 """
-function adjust_model(database, variation_tres = .5)
+function adjust_model(database, variation_tres = 0.5)
     dGr_dict, dGr_bounds = collect_dGr_bounds(database)
-    
+
     for rxn in reactions(database)
         if startswith(rxn, "EX_") #excluding exchanges
             database = remove_reaction(database, rxn)
@@ -37,7 +37,7 @@ function adjust_model(database, variation_tres = .5)
             database = remove_reaction(database, rxn)
         else
             try
-                if dGr_dict[rxn].val.err/dGr_dict[rxn].val.val > variation_tres
+                if dGr_dict[rxn].val.err / dGr_dict[rxn].val.val > variation_tres
                     database = remove_reaction(database, rxn)
                 end
             catch
@@ -47,7 +47,7 @@ function adjust_model(database, variation_tres = .5)
     end
 
     mod_bounds = OrderedDict()
-    for (k ,v) in dGr_bounds
+    for (k, v) in dGr_bounds
         if k in reactions(database)
             mod_bounds[k] = v
         end
