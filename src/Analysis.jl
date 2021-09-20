@@ -1,10 +1,10 @@
 """
-    OptStoic(os_model, return_solution = true)
+    optimize_OptStoic(os_model, return_solution = true)
 
 Optimizes an previously built optstoic model. Returns optimized model `os_model` and a
 dictionary with the optimized stoichiometry `res_dc` if `return_solution` is `true`.
 """
-# function OptStoic(os_model, return_solution = true)
+# function optimize_OptStoic(os_model, return_solution = true)
 # optimize!(os_model)
 # if return_solution == false
 #     return os_model

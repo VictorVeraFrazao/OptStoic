@@ -1,5 +1,13 @@
 """
-    build_OptStoic_model(database, energy_dc, substrate::String, targets::Vector{String}, co_reactants::Vector{String}; variable_bounds = Dict("substrate" => 1, "reactants" => 15), dG_thres = -5)
+    build_OptStoic_model(
+        database,
+        energy_dc,
+        substrate::String,
+        targets::Vector{String},
+        co_reactants::Vector{String};
+        variable_bounds = Dict("substrate" => 1, "reactants" => 15),
+        dG_thres = -5,
+    )
 
 Returns model for OptStoic procedure. Work in progress, supports Gurobi exclusively, other (open-sourced) solvers are planned.
 """

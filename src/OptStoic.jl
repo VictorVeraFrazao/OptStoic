@@ -12,4 +12,8 @@ using Gurobi
 include("ModelBuilds.jl")
 include("Analysis.jl")
 
+export build_OptStoic_model,
+    build_MinFlux_model,
+    optimize_OptStoic
+
 end
