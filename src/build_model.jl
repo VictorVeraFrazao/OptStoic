@@ -10,6 +10,11 @@
     )
 
 Returns model for OptStoic procedure. Work in progress, supports Gurobi exclusively, other (open-sourced) solvers are planned.
+
+# Example
+```
+add example here
+```
 """
 function build_OptStoic_model(
     database,

@@ -1,6 +1,14 @@
 
 """
-    function collect_dGf(database; ph::Float64 = 7.0, pmg::Float64 = 2.0, i_strengh::Quantity = 100.0u"mM", temp::Quantity = 25u"°C", db_id = bigg)
+    collect_dGf(
+        database;
+        ph::Float64 = 7.0,
+        pmg::Float64 = 2.0,
+        i_strengh::Quantity = 100.0u"mM",
+        temp::Quantity = 25u"°C",
+        db_id = bigg,
+    )
+
 Collects ΔG of formation for all metabolites in `database` via Component Contribution.
 Kwargs setup eQuilibrator conditions.
 """
@@ -38,7 +46,16 @@ function collect_dGf(
 end
 
 """
-    function collect_dGr_bounds(database; return_opts::Int = 3, ph::Float64 = 7.0, pmg::Float64 = 2.0, i_strengh::Quantity = 100.0u"mM", temp::Quantity = 25u"°C", db_id = bigg)
+    collect_dGr_bounds(
+        database;
+        return_opts::Int = 3,
+        ph::Float64 = 7.0,
+        pmg::Float64 = 2.0,
+        i_strength::Quantity = 100.0u"mM",
+        temp::Quantity = 25u"°C",
+        db_id = bigg,
+    )
+
 Collects ΔG of reaction for every reaction in `database` via Component Contribution.
 Returns dictionary of ΔG of reactions (`return_opts = 1`), the calculated bounds for MinFlux/MinRxn (`return_opts = 2`) or both (`return_opts = 3`).
 Kwargs setup eQuilibrator conditions and return.
@@ -147,6 +164,3 @@ function reaction_bounds(bound_dc; M = 1000)
     end
     return binary_dc_lb, binary_dc_ub
 end
-
-
-

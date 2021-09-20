@@ -9,11 +9,9 @@ using OrderedCollections
 using JuMP
 using Gurobi
 
-include("ModelBuilds.jl")
-include("Analysis.jl")
+include("build_model.jl")
+include("analysis.jl")
 
-export build_OptStoic_model,
-    build_MinFlux_model,
-    optimize_OptStoic
+export build_OptStoic_model, build_MinFlux_model
 
 end
