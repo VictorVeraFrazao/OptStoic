@@ -6,7 +6,6 @@ using Unitful, Measurements
 using ProgressMeter
 using Suppressor
 using JuMP
-using Gurobi
 
 include("build_model.jl")
 include("analysis.jl")

@@ -9,7 +9,8 @@
         dG_thres = -5,
     )
 
-Returns model for OptStoic procedure. Work in progress, supports Gurobi exclusively, other (open-sourced) solvers are planned.
+Returns model for OptStoic procedure. Work in progress, solver needs to be able to handle
+MIPs? exclusively.
 
 # Example
 ```
@@ -21,11 +22,12 @@ function build_OptStoic_model(
     energy_dc,
     substrate::String,
     targets::Vector{String},
-    co_reactants::Vector{String};
+    co_reactants::Vector{String},
+    optimizer;
     variable_bounds = Dict("substrate" => 1, "reactants" => 15),
     dG_thres = -5,
 )
-    os_model = Model(Gurobi.Optimizer)
+    os_model = Model(optimizer)
 
     # Collecting elements for constraints
     participants = vcat(targets, co_reactants)
@@ -102,9 +104,9 @@ end
     function build_MinFlux_model(database, dG_ub, dG_lb, optstoic_solution)
 Builds model for MinFlux procedure.
 """
-function build_MinFlux_model(database, dG_ub, dG_lb, optstoic_solution)
+function build_MinFlux_model(database, dG_ub, dG_lb, optstoic_solution, optimizer)
 
-    mf_model = Model(Gurobi.Optimizer)
+    mf_model = Model(optimizer)
 
     ex_vec = Vector()
     for (comp, coeff) in optstoic_solution
