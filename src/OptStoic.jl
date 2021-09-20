@@ -5,7 +5,6 @@ using eQuilibrator
 using Unitful, Measurements
 using ProgressMeter
 using Suppressor
-using OrderedCollections
 using JuMP
 using Gurobi
 
