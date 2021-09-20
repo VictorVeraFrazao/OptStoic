@@ -8,7 +8,7 @@ using Suppressor
 using JuMP
 
 include("build_model.jl")
-include("analysis.jl")
+include("Analysis.jl")
 
 export build_OptStoic_model, build_MinFlux_model
 
