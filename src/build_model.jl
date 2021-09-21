@@ -1,33 +1,46 @@
 """
     build_OptStoic_model(
         database,
-        energy_dc,
         substrate::String,
         targets::Vector{String},
-        co_reactants::Vector{String};
+        co_reactants = String[],
+        energy_dc = Dict();
+        optimizer;
         variable_bounds = Dict("substrate" => 1, "reactants" => 15),
         dG_thres = -5,
     )
 
-Returns model for OptStoic procedure. Work in progress, solver needs to be able to handle
+Returns model for OptStoic procedure. Database should be of the `COBREXA.StandardModel` type. The `substrate` string should be the ID of the limiting metabolite (e.g. glucose). The `targets` vector should only contain the products that should be contained. If metabolites should be allowed as co-factors or co-reactants in the overall stoichiometry, pass them via the `co_reactants` vector. The ΔG of formation for the database metabolites can be passed via `energy_dc` as a dictionary. If none is passed they are calculated automatically (be aware that this increases runtime). Kwargs are used for constraint bounds.
+    
+    Work in progress, solver needs to be able to handle
 MIPs? exclusively.
 
 # Example
 ```
-add example here
+build_OptStoic_model(
+    ecoli_core,
+    "glc__D_e",
+    ["pyr_e", "atp_c"],
+    ["adp_c", "nadh_c", "nad_c", "h2o_e", "h_e"],
+    optimizer = Gurobi
+)
 ```
 """
 function build_OptStoic_model(
     database,
-    energy_dc,
     substrate::String,
     targets::Vector{String},
-    co_reactants::Vector{String},
+    co_reactants = String[],
+    energy_dc = Dict();
     optimizer;
     variable_bounds = Dict("substrate" => 1, "reactants" => 15),
     dG_thres = -5,
 )
     os_model = Model(optimizer)
+
+    if isempty(energy_dc)
+        energy_dc = collect_dGf(database)
+    end
 
     # Collecting elements for constraints
     participants = vcat(targets, co_reactants)
