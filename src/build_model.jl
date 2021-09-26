@@ -12,8 +12,7 @@
 
 Returns model for OptStoic procedure. Database should be of the `COBREXA.StandardModel` type. The `substrate` string should be the ID of the limiting metabolite (e.g. glucose). The `targets` vector should only contain the products that should be contained. If metabolites should be allowed as co-factors or co-reactants in the overall stoichiometry, pass them via the `co_reactants` vector. The ΔG of formation for the database metabolites can be passed via `energy_dc` as a dictionary. If none is passed they are calculated automatically (be aware that this increases runtime). Kwargs are used for constraint bounds.
     
-    Work in progress, solver needs to be able to handle
-MIPs? exclusively.
+    Work in progress, solver needs to be able to handle MIPs? exclusively.
 
 # Example
 ```
@@ -30,13 +29,13 @@ function build_OptStoic_model(
     database,
     substrate::String,
     targets::Vector{String},
-    co_reactants = String[],
-    energy_dc = Dict();
+    co_reactants::Vector{String},
     optimizer;
+	energy_dc = Dict(),
     variable_bounds = Dict("substrate" => 1, "reactants" => 15),
     dG_thres = -5,
 )
-    os_model = Model(optimizer)
+    os_model = Model(optimizer.Optimizer)
 
     if isempty(energy_dc)
         energy_dc = collect_dGf(database)
@@ -57,11 +56,17 @@ function build_OptStoic_model(
     dgf_targets = Vector()
     for met in targets
         push!(dgf_targets, energy_dc[met].val.val)
+        if met ∉ keys(variable_bounds)
+            variable_bounds[met] = variable_bounds["reactants"]
+        end
     end
 
     dgf_cor = Vector()
     for met in co_reactants
         push!(dgf_cor, energy_dc[met].val.val)
+        if met ∉ keys(variable_bounds)
+            variable_bounds[met] = variable_bounds["reactants"]
+        end
     end
 
     # Assigning variables and constraints
@@ -69,11 +74,11 @@ function build_OptStoic_model(
         os_model,
         begin
             S == -1 * variable_bounds["substrate"], (base_name = substrate, integer = true)
-            1 ≤ T[it = 1:length(targets)] ≤ variable_bounds["reactants"],
+            1 ≤ T[it = 1:length(targets)] ≤ variable_bounds[targets[it]],
             (start = it, base_name = targets[it], integer = true)
-            -1 * variable_bounds["reactants"] ≤
+            -1 * variable_bounds[co_reactants[it]] ≤
             CoR[it = 1:length(co_reactants)] ≤
-            variable_bounds["reactants"],
+            variable_bounds[co_reactants[it]],
             (start = it, base_name = co_reactants[it], integer = true)
         end
     )
@@ -114,26 +119,44 @@ function build_OptStoic_model(
 end
 
 """
-    function build_MinFlux_model(database, dG_ub, dG_lb, optstoic_solution)
-Builds model for MinFlux procedure.
+    function build_MinFlux_model(
+        database,
+        optstoic_solution,
+        dGr_dict;
+        optimizer,
+    )
+Builds model for MinFlux procedure. The given `database` is automatically adapted and the ΔG of reactions are calculated internally. Alternatively a manually adapted model, together with a ΔG list/dictionary can be hand over (WORK IN PROGRESS!).
 """
-function build_MinFlux_model(database, dG_ub, dG_lb, optstoic_solution, optimizer)
+function build_MinFlux_model(
+    database,
+    optstoic_solution,
+    dGr_dict = Dict(); 
+    optimizer,
+)
 
-    mf_model = Model(optimizer)
+    if isempty(dGr_dict)
+        database, dGr_dict = adjust_model(database)
+    end
+    b_dict = reaction_bounds(dGr_dict)
+    mf_model = Model(optimizer.Optimizer)
 
     ex_vec = Vector()
+
     for (comp, coeff) in optstoic_solution
         push!(ex_vec, Reaction(string("EX_", comp), Dict(comp => -1)))
-        dG_lb[comp] = coeff
-        dG_ub[comp] = coeff
+        b_dict[string("EX_", comp)] = (coeff, coeff)
     end
-
-    lbs = collect(values(dG_lb))
-    ubs = collect(values(dG_ub))
-
     for ex in ex_vec
         add_reaction!(database, ex)
     end
+
+    lbs = Vector()
+    ubs = Vector()
+    for x in collect(values(b_dict))
+        push!(lbs, x[1]) # Collecting lower bounds
+        push!(ubs, x[2]) # Collecting upper bounds
+    end
+
     @variable(mf_model, V[i = 1:length(reactions(database))])
     @variable(mf_model, X[i = 1:length(reactions(database))])
     @constraint(mf_model, MassBalance, stoichiometry(database) * V .== balance(database))
