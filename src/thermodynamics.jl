@@ -131,7 +131,7 @@ function collect_dGr_bounds(
         end
         next!(p2)
     end
-    if return_opts == 3
+    if return_opts == 3 # Returns both ΔG of reaction dictionary and the calculated bounds
         return dGr_standard_dict, dGr_bounds
     elseif return_opts == 2
         return dGr_bounds
@@ -143,24 +143,29 @@ function collect_dGr_bounds(
     end
 end
 
-
+"""
+    function reaction_bounds(bound_dc; M = 1000)
+Calculates the lower and upper bound for the MinFlux procedure constraints.
+"""
 function reaction_bounds(bound_dc; M = 1000)
-    binary_dc_lb = OrderedDict()
-    binary_dc_ub = OrderedDict()
+    binary_dc = Dict()
     for (rxn, vals) in bound_dc
-        #LB binaries
-        if vals[1] < 0
+        # Calculating binaries
+        if vals[2] ≤ 0
             LB = 0
         else
             LB = -M
         end
-        if vals[2] < 0
+        if vals[1] < 0
             UB = M
         else
             UB = 0
         end
-        binary_dc_lb[rxn] = LB
-        binary_dc_ub[rxn] = UB
+        if LB > UB
+            LB = 0
+            UB = 0
+        end
+        binary_dc[rxn] = (LB, UB)
     end
-    return binary_dc_lb, binary_dc_ub
+    return binary_dc
 end
