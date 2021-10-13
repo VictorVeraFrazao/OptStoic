@@ -3,7 +3,7 @@
 Adapts stoichiometric formulae of a `MetabolicModel` for OptStoic constraints.
 Returns a dictionary of updated formulae of the model, so that every present metabolite has an entry for all chemical elements within the models.
 """
-function extend_formulae(database)
+function _extend_formulae(database)
     updated_formulae = Dict()
     elem_set = Vector()
     for m in metabolites(database)
@@ -25,9 +25,11 @@ end
 
 """
     function adjust_model(database, variation_tres =.5, dGr_dict =Dict())
+
+DEV NOTE: Necessary for MinFlux/MinRxn procedure, currently work in progress. Function might change severely.
 Reduces model to usable reactions. It excludes exchange reactions, those where no Gibbs free energy could be calculated or with too large standard deviation, depending on the given coefficient of variation threshold (`variation_tres`). 
 """
-function adjust_model(database, variation_tres = 0.9)
+function _adjust_model(database, variation_tres = 0.9)
     dGr_dict, dGr_bounds = collect_dGr_bounds(database)
 
     for rxn in reactions(database)

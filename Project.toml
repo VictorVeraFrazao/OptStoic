@@ -5,14 +5,17 @@ version = "0.2.0"
 
 [deps]
 COBREXA = "babc4406-5200-4a30-9033-bf5ae714c842"
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Gurobi = "2e9cd046-0924-5485-92f1-d5272153d98b"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
+OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
+PlotlyJS = "f0f68f2c-4968-5e81-91da-67840de0976a"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Suppressor = "fd094767-a336-5f1f-9728-57cf17d0bbfb"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 eQuilibrator = "9d196975-2c9b-462f-a3cc-8957d44b8c95"
-OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 
 [compat]
 COBREXA = "1.0.5"

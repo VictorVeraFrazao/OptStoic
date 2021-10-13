@@ -2,6 +2,7 @@
 """
     collect_dGf(
         database;
+        dGf_dict = OrderedDict(),
         ph::Float64 = 7.0,
         pmg::Float64 = 2.0,
         i_strengh::Quantity = 100.0u"mM",
@@ -9,36 +10,92 @@
         db_id = bigg,
     )
 
-Collects ΔG of formation for all metabolites in `database` via Component Contribution.
-Kwargs setup eQuilibrator conditions.
+Collects ΔG of formation for all metabolites in `database` via Component Contribution. The data bank source must be passed by `db_id` (Options: `bigg`, `kegg`, `metanex`, `chebi`). Alternatively a dictionary of ΔGs of formation `dGf_dict` can be passed to extend it by new entries for the database metabolites.
+Keyword arguments setup eQuilibrator conditions.
+
+# Example
+```
+collect_dGf(
+    ecoli_core,
+    bigg
+)
+```
 """
 function collect_dGf(
-    database;
+    database,
+    db_id;
+    dGf_dict = OrderedDict(),
     ph::Float64 = 7.0,
     pmg::Float64 = 2.0,
     i_strengh::Quantity = 100.0u"mM",
     temp::Quantity = 25u"°C",
-    db_id = bigg,
 )
     println("eQuilibrator is initialized. Please wait...")
+
     equil = eQuilibrator.Equilibrator(
         pH = ph,
         pMg = pmg,
         ionic_strength = i_strengh,
         temperature = temp,
     )
-    dGf_dict = OrderedDict()
+
     n = length(metabolites(database))
     p = Progress(n, 1)
     for met in metabolites(database)
-        rxn_str = string(" = ", met[1:end-2])
-        try
-            @suppress begin
-                dGf_dict[met] =
-                    physiological_dg_prime(equil, db_id(rxn_str); balance_warn = false)
+        if met ∉ keys(dGf_dict)
+            rxn_str = string(" = ", met[1:end-2])
+            try
+                @suppress begin
+                    dGf_dict[met] =
+                        physiological_dg_prime(equil, db_id(rxn_str); balance_warn = false)
+                end
+            catch
+                dGf_dict[met] = "NA"
             end
-        catch
-            dGf_dict[met] = "NA"
+        end
+        next!(p)
+    end
+    return dGf_dict
+end
+
+"""
+    collect_dGf(
+        database,
+        equil,
+        db_id;
+        dGf_dict = OrderedDict(),
+    )
+
+Collects ΔG of formation for all metabolites in `database` via Component Contribution. The data bank source must be passed by `db_id` (Options: `bigg`, `kegg`, `metanex`, `chebi`). An eQuilibrator setup has to be passed by `equil` (see also: https://github.com/stelmo/Equilibrator.jl). Alternatively a dictionary of ΔGs of formation `dGf_dict` can be passed to extend it by new entries for the database metabolites.
+
+# Example
+```
+collect_dGf(
+    ecoli_core,
+    eQuilibrator.Equilibrator(ionic_strength=150.0u"mM"),
+    bigg
+)
+```
+"""
+function collect_dGf(
+    database,
+    equil;
+    dGf_dict = OrderedDict(),
+    db_id = bigg,
+)
+    n = length(metabolites(database))
+    p = Progress(n, 1)
+    for met in metabolites(database)
+        if met ∉ keys(dGf_dict)
+            rxn_str = string(" = ", met[1:end-2])
+            try
+                @suppress begin
+                    dGf_dict[met] =
+                        physiological_dg_prime(equil, db_id(rxn_str); balance_warn = false)
+                end
+            catch
+                dGf_dict[met] = "NA"
+            end
         end
         next!(p)
     end
@@ -56,6 +113,7 @@ end
         db_id = bigg,
     )
 
+DEV NOTE: Necessary for MinFlux/MinRxn procedure, currently work in progress. Function might change severely.
 Collects ΔG of reaction for every reaction in `database` via Component Contribution.
 Returns dictionary of ΔG of reactions (`return_opts = 1`), the calculated bounds for MinFlux/MinRxn (`return_opts = 2`) or both (`return_opts = 3`).
 Kwargs setup eQuilibrator conditions and return.
@@ -145,10 +203,12 @@ end
 
 """
     function reaction_bounds(bound_dc; M = 1000)
+        
+DEV NOTE: Necessary for MinFlux/MinRxn procedure, currently work in progress. Function might change severely.
 Calculates the lower and upper bound for the MinFlux procedure constraints.
 """
 function reaction_bounds(bound_dc; M = 1000)
-    binary_dc = Dict()
+    binary_dc = OrderedDict()
     for (rxn, vals) in bound_dc
         # Calculating binaries
         if vals[2] ≤ 0
