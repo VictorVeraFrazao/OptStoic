@@ -1,13 +1,13 @@
 
 """
     collect_dGf(
-        database;
+        database,
+        db_id;
         dGf_dict = OrderedDict(),
         ph::Float64 = 7.0,
         pmg::Float64 = 2.0,
         i_strengh::Quantity = 100.0u"mM",
         temp::Quantity = 25u"°C",
-        db_id = bigg,
     )
 
 Collects ΔG of formation for all metabolites in `database` via Component Contribution. The data bank source must be passed by `db_id` (Options: `bigg`, `kegg`, `metanex`, `chebi`). Alternatively a dictionary of ΔGs of formation `dGf_dict` can be passed to extend it by new entries for the database metabolites.
@@ -79,9 +79,9 @@ collect_dGf(
 """
 function collect_dGf(
     database,
-    equil;
+    equil,
+    db_id;
     dGf_dict = OrderedDict(),
-    db_id = bigg,
 )
     n = length(metabolites(database))
     p = Progress(n, 1)

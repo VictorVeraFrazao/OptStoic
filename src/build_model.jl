@@ -41,7 +41,7 @@ build_OptStoic_model(
 ```
 """
 function build_OptStoic_model(
-    database::S,
+    database::SM,
     substrate::String,
     targets::Vector{String},
     co_reactants::Vector{String},
@@ -52,7 +52,7 @@ function build_OptStoic_model(
     custom_bounds = Dict(),
     dG_thres = -5,
     IP = true,
-) where {S<:COBREXA.StandardModel}
+) where {SM<:COBREXA.StandardModel}
 
     # Constructing the LP model
     os_model = Model(optimizer.Optimizer)
