@@ -5,7 +5,6 @@ using Unitful, Measurements
 using ProgressMeter
 using Suppressor
 using JuMP
-println("OptStoic Julia module is supported by:")
 using COBREXA
 using OrderedCollections
 
