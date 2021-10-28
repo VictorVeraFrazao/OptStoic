@@ -168,9 +168,10 @@ function collect_dGr_bounds(
     for (rxn, dG) in dGr_standard_dict
         try
             @suppress begin
-                reactants = [v for (k, v) in reaction_stoichiometry(database, rxn) if v > 0]
-                products =
+                reactants = 
                     [abs(v) for (k, v) in reaction_stoichiometry(database, rxn) if v < 0]
+                products =
+                    [abs(v) for (k, v) in reaction_stoichiometry(database, rxn) if v > 0]
                 qmax =
                     prod(fill(0.1, length(products)) .^ products) /
                     prod(fill(1 * 10^-6, length(reactants)) .^ reactants)
