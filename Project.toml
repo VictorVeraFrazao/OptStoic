@@ -19,7 +19,7 @@ eQuilibrator = "9d196975-2c9b-462f-a3cc-8957d44b8c95"
 
 [compat]
 COBREXA = "1.0.5"
-JuMP = "0.21"
+JuMP = "0.21, 0.22"
 Measurements = "2.6"
 ProgressMeter = "1.7"
 Suppressor = "0.2"
