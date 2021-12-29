@@ -1,4 +1,13 @@
 """
+LP model construction routines
+
+Function names list (order by appearance in code):
+    build_OptStoic_model
+    build_MinFlux_model
+    build_MinRxn_model
+"""
+
+"""
     build_OptStoic_model(
         database::S,
         substrate::String,
@@ -59,7 +68,7 @@ function build_OptStoic_model(
 
     # Collecting ΔG of formation if no data is passed manually. Throws error if the given data does not cover the metabolite data of the given model
     if isempty(energy_dc)
-        energy_dc = collect_dGf(database, db_id)
+        energy_dc = collect_formation_dg(database, db_id)
     else
         for met in metabolites(database)
             if met ∉ keys(energy_dc)
@@ -199,12 +208,12 @@ function build_MinFlux_model(
     @constraint(mf_model, abscon2, X .>= -V)
     @objective(mf_model, Min, sum(X))
 
-    return mf_model
+    return database, mf_model
 
 end
 
 """
-    function build_MinFlux_model(
+    function build_MinRxn_model(
         database,
         optstoic_solution,
         dGr_dict = Dict();
