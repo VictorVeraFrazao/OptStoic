@@ -51,13 +51,13 @@ build_OptStoic_model(
 """
 function build_OptStoic_model(
     database::SM,
-    substrate::String,
+    substrates::Vector{String},
     targets::Vector{String},
     co_reactants::Vector{String},
     optimizer;
     db_id = bigg,
 	energy_dc = Dict(),
-    variable_bounds = Dict("substrate" => -1, "reactants" => (-15, 15)),
+    variable_bounds = Dict("substrates" => -1, "reactants" => (-15, 15)),
     custom_bounds = Dict(),
     dG_thres = -5,
     IP = true,
@@ -69,19 +69,18 @@ function build_OptStoic_model(
     # Collecting ΔG of formation if no data is passed manually. Throws error if the given data does not cover the metabolite data of the given model
     if isempty(energy_dc)
         energy_dc = collect_formation_dg(database, db_id)
-    else
-        for met in metabolites(database)
-            if met ∉ keys(energy_dc)
-                throw(MissingValueError(met, "metabolite ΔG or formation not defined"))
-            end
-        end
+#    else
+#        for met in metabolites(database)
+#            if met ∉ keys(energy_dc)
+#                throw(MissingValueError(met, "metabolite ΔG or formation not defined"))
+#            end
+#        end
     end
 
     merge!(variable_bounds, custom_bounds) # Adds custom bounds to the variable bounds
 
     # Collecting elements for constraints
-    participants = vcat(targets, co_reactants)
-    push!(participants, substrate)
+    participants = vcat(substrates, targets, co_reactants)
     elements = Vector{String}()
     for met in participants
         elements = vcat(elements, collect(keys(metabolite_formula(database, met))))
@@ -93,7 +92,13 @@ function build_OptStoic_model(
     ext_formulae = _extend_formulae(database)
 
     # Assigning ΔGs for constraints
-    dgf_substrate = energy_dc[substrate].val.val
+    dgf_substrates = Vector()
+    for met in substrates
+        push!(dgf_substrates, energy_dc[met].val.val)
+        if met ∉ keys(variable_bounds)
+            variable_bounds[met] = variable_bounds["substrates"]
+        end
+    end
 
     dgf_targets = Vector()
     for met in targets
@@ -115,7 +120,8 @@ function build_OptStoic_model(
     @variables(
         os_model,
         begin
-            S == variable_bounds["substrate"], (base_name = substrate, integer = IP)
+            S[it = 1:length(substrates)] == variable_bounds[substrates[it]],
+            (start = it, base_name = substrates[it], integer = IP)
             1 ≤ T[it = 1:length(targets)] ≤ variable_bounds[targets[it]][2],
             (start = it, base_name = targets[it], integer = IP)
             variable_bounds[co_reactants[it]][1] ≤
@@ -130,7 +136,8 @@ function build_OptStoic_model(
         EnergyBalance,
         sum(T[it] * dgf_targets[it] for it = 1:length(targets)) +
         sum(CoR[it] * dgf_cor[it] for it = 1:length(co_reactants)) +
-        S * dgf_substrate ≤ dG_thres
+        sum(S[it] * dgf_substrates[it] for it = 1:length(substrates)) 
+        ≤ dG_thres
     )
     @constraint(
         os_model,
@@ -140,7 +147,8 @@ function build_OptStoic_model(
             CoR[it] * metabolite_charge(database, co_reactants[it]) for
             it = 1:length(co_reactants)
         ) +
-        S * metabolite_charge(database, substrate) == 0
+        sum(S[it] * metabolite_charge(database, substrates[it]) for it = 1:length(substrates))
+        == 0
     )
     for elem in elements
         @constraint(
@@ -151,10 +159,12 @@ function build_OptStoic_model(
                 CoR[it] * ext_formulae[co_reactants[it]][elem] for
                 it = 1:length(co_reactants)
             ) +
-            S * ext_formulae[substrate][elem] == 0
+            sum(S[it] * ext_formulae[substrates[it]][elem] for it = 1:length(substrates))
+            == 0
         )
 
-        @objective(os_model, Max, sum(T) / -1 * S) # Objective function
+        c_norm = -1 * sum(variable_bounds[substrates[it]] * ext_formulae[substrates[it]]["C"] for it = 1:length(substrates)) # carbon normalization factor
+        @objective(os_model, Max, sum(T) / c_norm) # Objective function
     end
 
     return os_model
@@ -172,16 +182,17 @@ MinFlux optimisation model construction. WORK IN PROGRESS!!! Documentation will 
 function build_MinFlux_model(
     database,
     optstoic_solution,
-    dGr_dict = Dict(); 
+    dGr_dict = Dict();
     optimizer,
 )
-
     if isempty(dGr_dict)
         database, dGr_dict = adjust_model(database)
+        b_dict = reaction_bounds(dGr_dict)
+    else
+        b_dict = dGr_dict
     end
-    b_dict = reaction_bounds(dGr_dict)
-    mf_model = Model(optimizer.Optimizer)
 
+    mf_model = Model(optimizer.Optimizer)
     ex_vec = Vector()
 
     for (comp, coeff) in optstoic_solution
@@ -189,9 +200,10 @@ function build_MinFlux_model(
         b_dict[string("EX_", comp)] = (coeff, coeff)
     end
     for ex in ex_vec
-        add_reaction!(database, ex)
+        if ex ∉ reactions(database)
+            add_reaction!(database, ex)
+        end
     end
-
     lbs = Vector()
     ubs = Vector()
     for x in collect(values(b_dict))
@@ -212,36 +224,58 @@ function build_MinFlux_model(
 
 end
 
+function Nred(database)
+    return nullspace(Array(stoichiometry(database)[:, [i for i in 1:length(reactions(database))]]))
+end
 """
-    function build_MinRxn_model(
+    function build_MinFlux_mod_model(
         database,
         optstoic_solution,
+        L = [],
         dGr_dict = Dict();
         optimizer,
+        loopless = false,
+        ϵ = 10^(-5),
+        M = 1000
     )
-MinRxn optimisation model construction. WORK IN PROGRESS!!! Documentation will follow.
+Modified MinFlux formulation, including integer cut constraints. WORK IN PROGRESS!!! Documentation will follow.
 """
-function build_MinRxn_model(
+function build_MinFlux_mod_model(
     database,
     optstoic_solution,
-    dGr_dict = Dict(); 
+    dGr_dict = Dict();
+    L = [],
     optimizer,
+    loopless = false,
+    N_red = [],
+    ϵ = 10^(-5),
+    M = 1000
 )
-
     if isempty(dGr_dict)
         database, dGr_dict = adjust_model(database)
+        b_dict = reaction_bounds(dGr_dict)
+    else
+        b_dict = dGr_dict
     end
-    b_dict = reaction_bounds(dGr_dict)
-    mf_model = Model(optimizer.Optimizer)
 
+    mf_model = Model(optimizer.Optimizer)
     ex_vec = Vector()
+
+    if loopless
+        if isempty(N_red)
+            N_red = Nred(database)
+        end
+        red_dim = size(N_red)[1]
+    end
 
     for (comp, coeff) in optstoic_solution
         push!(ex_vec, Reaction(string("EX_", comp), Dict(comp => -1)))
         b_dict[string("EX_", comp)] = (coeff, coeff)
     end
     for ex in ex_vec
-        add_reaction!(database, ex)
+        if ex ∉ reactions(database)
+            add_reaction!(database, ex)
+        end
     end
 
     lbs = Vector()
@@ -251,17 +285,67 @@ function build_MinRxn_model(
         push!(ubs, x[2]) # Collecting upper bounds
     end
 
-    @variable(mf_model, V[i = 1:length(reactions(database))])
-    @variable(mf_model, Y[i = 1:length(reactions(database))], Bin)
-    @constraint(mf_model, MassBalance, stoichiometry(database) * V .== balance(database))
-    @constraint(mf_model, LowerBounds, lbs .* Y .<= V)
-    @constraint(mf_model, Upperbounds, ubs .* Y .>= V)
-    for it in 1:length(Y)
-        @constraint(mf_model, Y[it] => {lbs[it] <= V[it] <= ubs[it]})
-        @constraint(mf_model, !Y[it] => {V[it] == 0})
+    rxn_size = length(reactions(database))
+    @variable(mf_model, V[i = 1:rxn_size], Int)
+    @variable(mf_model, X[i = 1:rxn_size])
+    @variable(mf_model, Vf[i = 1:rxn_size])
+    @variable(mf_model, Vr[i = 1:rxn_size])
+    @variable(mf_model, Yf[i = 1:rxn_size], Bin)
+    @variable(mf_model, Yr[i = 1:rxn_size], Bin)
+
+    if loopless
+        @variable(mf_model, G[i = 1:red_dim])
+        @variable(mf_model, a[i = 1:red_dim], Bin)
+
+        @constraint(mf_model, LoopBalance, N_red' * G .== 0)
+        @constraint(mf_model, L1, G .>= -M * a + (1 .- a))
+        @constraint(mf_model, L2, G .>= -a .+ M * (1 .- a))
+        @constraint(mf_model, L3, [V[it] for it in 1:length(V) if !startswith(reactions(database)[it], "EX_")] .>= -M * (1 .- a))
+        @constraint(mf_model, L4, [V[it] for it in 1:length(V) if !startswith(reactions(database)[it], "EX_")] .<= M * a)
     end
-    @objective(mf_model, Min, sum(Y))
 
-    return mf_model
+    @constraint(mf_model, MassBalance, stoichiometry(database) * V .== balance(database))
+    @constraint(mf_model, LowerBounds, lbs .<= V)
+    @constraint(mf_model, Upperbounds, ubs .>= V)
+    @constraint(mf_model, FluxDiff, V .== Vr - Vf)
+    @constraint(mf_model, FluxSum, X .== Vr + Vf)
+    @constraint(mf_model, ForwardFlux, Vf .>= 0)
+    @constraint(mf_model, ReverseFlux, Vr .>= 0)
+    @constraint(mf_model, abscon1, X .>= V)
+    @constraint(mf_model, abscon2, X .>= -V)
+    @constraint(mf_model, Vf .>= ϵ * Yf)
+    @constraint(mf_model, M * Yf .>= Vf)
+    @constraint(mf_model, Vr .>= ϵ * Yr)
+    @constraint(mf_model, M * Yf .>= Vr)
+    @constraint(mf_model, BinActive, 1 .>= Yf + Yr)
+    if !isempty(L)
+        for k in 1:length(L)
+            @constraint(mf_model, base_name = string("IntegerCut_it", k),
+            sum([1-Yf[it]-Yr[it] for it in 1:rxn_size if sum(L[k][it]) == 1 && !startswith(reactions(database)[it], "EX_")]) >= 1)
+        end
+    end
+    @objective(mf_model, Min, sum(X))
 
+    return database, mf_model
+
+end
+
+function extract_binaries(minflux_model, arr = [], ϵ = 0)
+    new_path = []
+    for i in 1:length(minflux_model[:Yf])
+        if value(minflux_model[:Vf][i]) <= 2*ϵ
+            yf = 0.0
+        else
+            yf = value(minflux_model[:Yf][i])
+        end
+        if value(minflux_model[:Vr][i]) <= 2*ϵ
+            yr = 0.0
+        else
+            yr = value(minflux_model[:Yr][i])
+        end
+        temptup = (yr, yf)
+        push!(new_path, temptup)
+    end
+
+    return push!(arr, new_path)
 end

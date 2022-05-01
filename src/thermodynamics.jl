@@ -2,21 +2,33 @@
 Thermdynamic data collection
 
 Function names list (order by appearance in code):
+    metacyc
+    metacycIllParsed
     collect_formation_dg (internal eQuilibrator setup)
     collect_formation_dg (overload without internal eQuilibrator setup)
+    collect_reaction_dg
+    reaction_dg_bounds
+    collect_dGr_bounds
+    reaction_bounds
 """
 
 """
     $(SIGNATURES)
-
 Returns reaction string with a prefixed "metacyc.compound:".
 """
 function metacyc(str)
     eQuilibrator._parse_reaction_string(str, "metacyc.compound")
 end
 
+"""
+    $(SIGNATURES)
+Returns modified string with prefixed "metacyc.compound:". If the MetaCyc-based model was created via the Python-based "Moped" module, metabolite and reaction names may have artifacts ("__45__" and "__45__" substrings) that should be replaced by a hyphen or periodt, respectively, before ΔG estimations.
+"""
 function metacycIllParsed(str)
-    nstr = replace(str, "__45__" => "-")
+    nstr = replace(str, "__45__46__45__" => "-46-")
+    nstr = replace(nstr, "__46__" => ".")
+    nstr = replace(nstr, "__45__" => "-")
+    nstr = replace(nstr, "__43__" => "+")
     eQuilibrator._parse_reaction_string(nstr, "metacyc.compound")
 end
 
@@ -119,7 +131,7 @@ function collect_formation_dg(
                         standard_dg_prime(equil, db_id(rxn_str); balance_warn = false)
                 end
             catch
-                dGf_dict[met] = "NA"
+                dGf_dict[met] = measurement(1000000u"kJ/mol", 10000000u"kJ/mol") #setting infeasible value
             end
         end
         next!(p)
@@ -158,44 +170,12 @@ function collect_reaction_dg(
                     dgr_dict[rxn] = standard_dg_prime(equil, rxn_string, balance_warn = false)
                 end
             catch
-                dgr_dict[rxn] = "NA"
+                dgr_dict[rxn] = measurement(1000000u"kJ/mol", 10000000u"kJ/mol") #setting infeasible value
             end
         end
         next!(p)
     end
     return dgr_dict
-end
-
-"""
-function reaction_dg_bounds(database, dgr_dict, low_con::Float64, high_con::Float64)
-Calculates the minimal and maximal transformed ΔG of reaction depending on a lower and a higher concentration (`low_con` and `high_con`, respectively). The standard transformed ΔGs of reaction are passed via `dgr_dict`.
-"""
-function reaction_dg_bounds(database, dgr_dict, low_con::Float64, high_con::Float64; temperature::Quantity = 298.15u"K")
-    ln_low = log(low_con)
-    ln_high = log(high_con)
-    R = 8.31446261815324u"J/(K*mol)"
-    R = uconvert(u"kJ/(K*mol)", R)
-
-    dg_bounds = OrderedDict()
-    for (rxn, dg) in dgr_dict
-        try
-            @suppress begin
-                #Collecting stoichiometric coefficient
-                educts = [abs(v) for (k, v) in reaction_stoichiometry(database, rxn) if v < 0]
-                products = [abs(v) for (k, v) in reaction_stoichiometry(database, rxn) if v > 0]
-
-                #Calculation of reaction quotient and transformed ΔG
-                qmin = ln_low * sum(products) - ln_high * sum(educts)
-                qmax = ln_high * sum(products) - ln_low * sum(educts)
-                dg_min = dg.val + R * temperature * qmin.val
-                dg_max = dg.val + R * temperature * qmax.val
-                dg_bounds[rxn] = (dg_min, dg_max)
-            end
-        catch
-            dg_bounds[rxn] = "NA"
-        end
-    end
-    return dg_bounds
 end
 
 """
@@ -300,31 +280,11 @@ function collect_dGr_bounds(
     end
 end
 
-"""
-    function reaction_bounds(bound_dc; M = 1000)
-        
-DEV NOTE: Necessary for MinFlux/MinRxn procedure, currently work in progress. Function might change severely.
-Calculates the lower and upper bound for the MinFlux procedure constraints.
-"""
-function reaction_bounds(bound_dc; M = 1000)
-    binary_dc = OrderedDict()
-    for (rxn, vals) in bound_dc
-        # Calculating binaries
-        if vals[2] ≤ 0
-            LB = 0
-        else
-            LB = -M
+function reduce_model(database, dg_dictionary)
+    for rxn in reactions(database)
+        if rxn ∉ keys(dg_dictionary)
+            database = remove_reaction(database, rxn)
         end
-        if vals[1] < 0
-            UB = M
-        else
-            UB = 0
-        end
-        if LB > UB
-            LB = 0
-            UB = 0
-        end
-        binary_dc[rxn] = (LB, UB)
     end
-    return binary_dc
+    return database
 end
