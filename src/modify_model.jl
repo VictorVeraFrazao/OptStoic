@@ -59,17 +59,3 @@ function adjust_model(database, variation_tres = 0.9)
 
     return database, mod_bounds
 end
-
-"""
-    function only_inner_cytosolic_reactions(database, cytosolic_suffix = "_c")
-
-Reduces model by reactions that are not balanced (e.g. exchange reactions) and by non-cytosolic reactions.
-"""
-function only_inner_cytosolic_reactions(database, cytosolic_suffix = "_c")
-    for rxn in reactions(database)
-        if !reaction_mass_balanced(database, rxn) || !endswith(rxn, cytosolic_suffix) #excluding exchanges and non-cytosolic reactions
-            database = remove_reaction(database, rxn)
-        end
-    end
-    return database
-end
