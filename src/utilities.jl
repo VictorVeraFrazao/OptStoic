@@ -1,3 +1,5 @@
+###DEPRECATED###WILL BE REMOVE SOON###
+
 """
     find_metabolite_by_formula(query::String, database)
 
