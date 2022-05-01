@@ -84,3 +84,36 @@ function MinFlux_preprocessing(
     dgs = reaction_dg_bounds(model, standard_Gibbs_dictionary, lower_concentration, upper_concentration, temperature = temperature)
     return flux_bounds(dgs, M = M)
 end
+
+"""
+    Nred(database)
+Returns internal matrix for loopless constraint for MinFlux.
+"""
+function Nred(database)
+    return nullspace(Array(stoichiometry(database)[:, [i for i in 1:length(reactions(database))]]))
+end
+
+"""
+    extend_formulae(database)
+Adapts stoichiometric formulae of a `MetabolicModel` for OptStoic constraints.
+Returns a dictionary of updated formulae of the model, so that every present metabolite has an entry for all chemical elements within the models.
+"""
+function _extend_formulae(database)
+    updated_formulae = Dict()
+    elem_set = Vector()
+    for m in metabolites(database)
+        elem_set = vcat(elem_set, collect(keys(metabolite_formula(database, m))))
+    end
+    elem_set = Set(elem_set)
+    for m in metabolites(database)
+        formula = metabolite_formula(database, m)
+        t = setdiff(elem_set, Set(collect(keys(formula))))
+        for i in t
+            if i ∉ keys(formula)
+                formula[i] = 0
+            end
+        end
+        updated_formulae[m] = formula
+    end
+    return updated_formulae
+end

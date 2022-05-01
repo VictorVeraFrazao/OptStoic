@@ -66,18 +66,8 @@ function build_OptStoic_model(
     # Constructing the LP model
     os_model = Model(optimizer.Optimizer)
 
-    # Collecting ΔG of formation if no data is passed manually. Throws error if the given data does not cover the metabolite data of the given model
-    if isempty(energy_dc)
-        energy_dc = collect_formation_dg(database, db_id)
-#    else
-#        for met in metabolites(database)
-#            if met ∉ keys(energy_dc)
-#                throw(MissingValueError(met, "metabolite ΔG or formation not defined"))
-#            end
-#        end
-    end
-
-    merge!(variable_bounds, custom_bounds) # Adds custom bounds to the variable bounds
+    # Adds custom bounds to the variable bounds
+    merge!(variable_bounds, custom_bounds)
 
     # Collecting elements for constraints
     participants = vcat(substrates, targets, co_reactants)
@@ -87,8 +77,8 @@ function build_OptStoic_model(
     end
     elements = Set(elements)
 
-    # Metabolite formulae are extended by empty values to allow mass balance in constraint construction.
-    # DEV NOTE: Process may be inefficient. Implementation of alternate processes recommended.
+    # Metabolite formulae are extended by "empty" elements to allow mass balance in constraint construction.
+    ### INEFFICIENT. WILL BE CHANGED SOON ###
     ext_formulae = _extend_formulae(database)
 
     # Assigning ΔGs for constraints
@@ -171,79 +161,24 @@ function build_OptStoic_model(
 end
 
 """
-    function build_MinFlux_model(
+    build_MinFlux_model(
         database,
         optstoic_solution,
-        dGr_dict;
+        dGr_dict = Dict();
+        L = [],
         optimizer,
+        loopless = false,
+        N_red = [],
+        ϵ = 10^(-5),
+        M = 1000
     )
-MinFlux optimisation model construction. WORK IN PROGRESS!!! Documentation will follow.
+MinFlux formulation. Returns MinFlux MILP model. Takes an overall stoichiometry or a previously calculated OptStoic solution dictionary (`optstoic_solution`) as argument. Stoichiometry may be structured as a dictionary with metabolite IDs as keys and the corresponding stoichiometric coefficients as values (negative for substrates, positive for products). The IDs need to match the corresponding metabolite IDs in the metabolic model (`database`). The flux_bounds_dictionary argument is a dictionary with the preprocessed boundaries (see function `flux_bounds` and `MinFlux_preprocessing`). Loopless constraints can be added by setting `loopless` as `true`. A precomiled matrix `N_red` for loopless constraints can additionally be passed to avoid automatic matrix calculation. 
+)
 """
 function build_MinFlux_model(
     database,
     optstoic_solution,
-    dGr_dict = Dict();
-    optimizer,
-)
-    if isempty(dGr_dict)
-        database, dGr_dict = adjust_model(database)
-        b_dict = reaction_bounds(dGr_dict)
-    else
-        b_dict = dGr_dict
-    end
-
-    mf_model = Model(optimizer.Optimizer)
-    ex_vec = Vector()
-
-    for (comp, coeff) in optstoic_solution
-        push!(ex_vec, Reaction(string("EX_", comp), Dict(comp => -1)))
-        b_dict[string("EX_", comp)] = (coeff, coeff)
-    end
-    for ex in ex_vec
-        if ex ∉ reactions(database)
-            add_reaction!(database, ex)
-        end
-    end
-    lbs = Vector()
-    ubs = Vector()
-    for x in collect(values(b_dict))
-        push!(lbs, x[1]) # Collecting lower bounds
-        push!(ubs, x[2]) # Collecting upper bounds
-    end
-
-    @variable(mf_model, V[i = 1:length(reactions(database))])
-    @variable(mf_model, X[i = 1:length(reactions(database))])
-    @constraint(mf_model, MassBalance, stoichiometry(database) * V .== balance(database))
-    @constraint(mf_model, LowerBounds, lbs .<= V)
-    @constraint(mf_model, Upperbounds, ubs .>= V)
-    @constraint(mf_model, abscon1, X .>= V)
-    @constraint(mf_model, abscon2, X .>= -V)
-    @objective(mf_model, Min, sum(X))
-
-    return database, mf_model
-
-end
-
-function Nred(database)
-    return nullspace(Array(stoichiometry(database)[:, [i for i in 1:length(reactions(database))]]))
-end
-"""
-    function build_MinFlux_mod_model(
-        database,
-        optstoic_solution,
-        L = [],
-        dGr_dict = Dict();
-        optimizer,
-        loopless = false,
-        ϵ = 10^(-5),
-        M = 1000
-    )
-Modified MinFlux formulation, including integer cut constraints. WORK IN PROGRESS!!! Documentation will follow.
-"""
-function build_MinFlux_mod_model(
-    database,
-    optstoic_solution,
-    dGr_dict = Dict();
+    flux_bounds_dictionary;
     L = [],
     optimizer,
     loopless = false,
@@ -251,26 +186,20 @@ function build_MinFlux_mod_model(
     ϵ = 10^(-5),
     M = 1000
 )
-    if isempty(dGr_dict)
-        database, dGr_dict = adjust_model(database)
-        b_dict = reaction_bounds(dGr_dict)
-    else
-        b_dict = dGr_dict
-    end
-
     mf_model = Model(optimizer.Optimizer)
-    ex_vec = Vector()
 
+    # If loopless constraints are activated and no constraint matrix L is passed via keyword, a matrix is constructed locally.
     if loopless
         if isempty(N_red)
             N_red = Nred(database)
         end
-        red_dim = size(N_red)[1]
+        red_dimensions = size(N_red)[1]
     end
 
+    ex_vec = Vector()
     for (comp, coeff) in optstoic_solution
         push!(ex_vec, Reaction(string("EX_", comp), Dict(comp => -1)))
-        b_dict[string("EX_", comp)] = (coeff, coeff)
+        flux_bounds_dictionary[string("EX_", comp)] = (coeff, coeff)
     end
     for ex in ex_vec
         if ex ∉ reactions(database)
@@ -280,7 +209,7 @@ function build_MinFlux_mod_model(
 
     lbs = Vector()
     ubs = Vector()
-    for x in collect(values(b_dict))
+    for x in collect(values(flux_bounds_dictionary))
         push!(lbs, x[1]) # Collecting lower bounds
         push!(ubs, x[2]) # Collecting upper bounds
     end
@@ -293,9 +222,10 @@ function build_MinFlux_mod_model(
     @variable(mf_model, Yf[i = 1:rxn_size], Bin)
     @variable(mf_model, Yr[i = 1:rxn_size], Bin)
 
+    # Adding loopless constraints, if loopless is true
     if loopless
-        @variable(mf_model, G[i = 1:red_dim])
-        @variable(mf_model, a[i = 1:red_dim], Bin)
+        @variable(mf_model, G[i = 1:red_dimensions])
+        @variable(mf_model, a[i = 1:red_dimensions], Bin)
 
         @constraint(mf_model, LoopBalance, N_red' * G .== 0)
         @constraint(mf_model, L1, G .>= -M * a + (1 .- a))
@@ -330,6 +260,12 @@ function build_MinFlux_mod_model(
 
 end
 
+
+"""
+    extract_binaries(minflux_model, arr = [], ϵ = 0)
+
+Creates tuple vector for cut constraints. Can be added to previous vector (`arr`) to extend previous cut constraints. `ϵ` is used as a threshold for residual float values in the binary LP variables.
+"""
 function extract_binaries(minflux_model, arr = [], ϵ = 0)
     new_path = []
     for i in 1:length(minflux_model[:Yf])
@@ -343,8 +279,8 @@ function extract_binaries(minflux_model, arr = [], ϵ = 0)
         else
             yr = value(minflux_model[:Yr][i])
         end
-        temptup = (yr, yf)
-        push!(new_path, temptup)
+
+        push!(new_path, (yr, yf))
     end
 
     return push!(arr, new_path)
