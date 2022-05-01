@@ -1,5 +1,7 @@
-using Pkg
-Pkg.activate(joinpath(Pkg.devdir(), "OptStoic/"))
+# Only needed if accessed via Dev directionary instead of `julia>]add OptStoic``
+#using Pkg
+#Pkg.activate(joinpath(Pkg.devdir(), "OptStoic/"))
+
 using OptStoic
 using Gurobi
 using JuMP
